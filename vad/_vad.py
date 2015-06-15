@@ -34,12 +34,12 @@ np.seterr(all='ignore')
 
 from numpy import sqrt, minimum, maximum, exp, pi, hamming, floor, zeros, \
     conj, isnan, log
-from scipy.fftpack import fft
+from numpy.lib.stride_tricks import as_strided
 from scipy.special import i0, i1
 
 
 class VAD(object):
-    def __init__(self, markov_params=(0.5, 0.1), alpha=0.99, NFFT=1024,
+    def __init__(self, fs, markov_params=(0.5, 0.1), alpha=0.99, NFFT=2048,
                  n_iters=10, win_size_sec=0.05, win_hop_sec=0.025,
                  max_est_iter=-1, epsilon=1e-6):
         """
@@ -53,6 +53,7 @@ class VAD(object):
         :param win_hop_sec: hop size in seconds
         :param epsilon: convergence epsilon
         """
+        self.fs = fs
         self.a01, self.a10 = markov_params
         self.a00 = 1 - self.a01
         self.a11 = 1 - self.a10
@@ -64,35 +65,41 @@ class VAD(object):
         self.n_iters = n_iters
         self.max_est_iter = max_est_iter
 
+        self.wlen = int(fs * self.win_size_sec)
+        self.fshift = int(fs * self.win_hop_sec)
+        self.win = hamming(self.wlen)
+
     def detect_speech(self, sig, fs, threshold, n_noise_frames=20):
         return self.activations(sig, fs, n_noise_frames) > threshold
 
-    def activations(self, sig, fs, n_noise_frames=20):
-        win_size_smp = int(fs * self.win_size_sec)
-        win_hop_smp = int(fs * self.win_hop_sec)
-        sig_length = len(sig)
-        hamming_win = hamming(win_size_smp)
-        n_frames = int(floor((sig_length - win_size_smp) / win_hop_smp))
+    def stft(self, sig):
+        s = np.pad(sig, (self.wlen//2, 0), 'constant')
+        cols = np.ceil((s.shape[0] - self.wlen) / self.fshift + 1)
+        s = np.pad(s, (0, self.wlen), 'constant')
+        frames = as_strided(s, shape=(cols, self.wlen),
+                            strides=(s.strides[0]*self.fshift,
+                                     s.strides[0])).copy()
+        return np.fft.rfft(frames*self.win, self.NFFT)
 
-        noise_var_tmp = zeros(self.NFFT)
-        for n in range(n_noise_frames):
-            frame = fft(hamming_win * sig[n * win_hop_smp:
-                                          n * win_hop_smp + win_size_smp],
-                        self.NFFT)
+    def activations(self, sig, fs, n_noise_frames=20):
+        frames = self.stft(sig)
+        n_frames = frames.shape[0]
+
+        noise_var_tmp = zeros(self.NFFT//2+1)
+        for n in xrange(n_noise_frames):
+            frame = frames[n]
             noise_var_tmp = noise_var_tmp + (conj(frame) * frame).real
 
         noise_var_orig = noise_var_tmp / n_noise_frames
         noise_var_old = noise_var_orig
 
         G_old = 1
-        A_MMSE = zeros((self.NFFT, n_frames))
-        G_MMSE = zeros((self.NFFT, n_frames))
+        A_MMSE = zeros((self.NFFT//2+1, n_frames))
+        G_MMSE = zeros((self.NFFT//2+1, n_frames))
 
         cum_Lambda = zeros(n_frames)
         for n in xrange(n_frames):
-            frame = fft(hamming_win * sig[n * win_hop_smp:
-                                          n * win_hop_smp + win_size_smp],
-                        self.NFFT)
+            frame = frames[n]
             frame_var = (conj(frame) * frame).real
 
             noise_var = noise_var_orig
