@@ -32,7 +32,7 @@ import numpy as np
 # by putmask before updating G_MMSE. errors are silenced to not bother the user
 np.seterr(all='ignore')
 
-from numpy import sqrt, minimum, maximum, exp, pi, hamming, floor, zeros, \
+from numpy import sqrt, minimum, maximum, exp, pi, hamming, zeros, \
     conj, isnan, log
 from numpy.lib.stride_tricks import as_strided
 from scipy.special import i0, i1
@@ -42,16 +42,26 @@ class VAD(object):
     def __init__(self, fs, markov_params=(0.5, 0.1), alpha=0.99, NFFT=2048,
                  n_iters=10, win_size_sec=0.05, win_hop_sec=0.025,
                  max_est_iter=-1, epsilon=1e-6):
-        """
+        """ Voice Activity Detection
 
-        Arguments:
-        :param markov_params: hangover scheme params
-        :param alpha: SNR estimate coefficient
-        :param NFFT: size of FFT
-        :param n_iters: number of iterations in noise estimation
-        :param win_size_sec: window size in seconds
-        :param win_hop_sec: hop size in seconds
-        :param epsilon: convergence epsilon
+        Parameters
+        ----------
+        fs : int
+            sampling rate
+        markov_params : (int, int)
+            parameters for the hangover scheme
+        alpha : float
+            SNR estimate coefficient
+        NFFT : int
+            size of the FFT
+        n_iters : int
+            number of iterations in noise estimation
+        win_size_sec : float
+            window size in seconds
+        win_hop_sec : float
+            window shift in seconds
+        epsilon : float
+            convergence threshold
         """
         self.fs = fs
         self.a01, self.a10 = markov_params
@@ -69,10 +79,36 @@ class VAD(object):
         self.fshift = int(fs * self.win_hop_sec)
         self.win = hamming(self.wlen)
 
-    def detect_speech(self, sig, fs, threshold, n_noise_frames=20):
-        return self.activations(sig, fs, n_noise_frames) > threshold
+    def detect_speech(self, sig, threshold, n_noise_frames=20):
+        """
+        Return binary speech/non-speech decisions for each frame.
+
+        Parameters
+        ----------
+        sig : ndarray
+            audio signal
+        threshold : float
+            decision threshold
+        n_noise_frames : int
+            number of frames at start of file to use for initial noise model
+
+        """
+        return self.activations(sig, n_noise_frames) > threshold
 
     def stft(self, sig):
+        """
+        Short term fourier transform.
+
+        Parameters
+        ----------
+        sig : ndarray
+            signal
+
+        Returns
+        -------
+        windowed fourier transformed signal
+
+        """
         s = np.pad(sig, (self.wlen//2, 0), 'constant')
         cols = np.ceil((s.shape[0] - self.wlen) / self.fshift + 1)
         s = np.pad(s, (0, self.wlen), 'constant')
@@ -81,7 +117,19 @@ class VAD(object):
                                      s.strides[0])).copy()
         return np.fft.rfft(frames*self.win, self.NFFT)
 
-    def activations(self, sig, fs, n_noise_frames=20):
+    def activations(self, sig, n_noise_frames=20):
+        """
+        Returns continuous activations of the voice activity detector.
+
+        Parameters
+        ----------
+
+        sig : ndarray
+            audio signal
+        n_noise_frames : int
+            number of frames at start of file to use for initial noise model
+
+        """
         frames = self.stft(sig)
         n_frames = frames.shape[0]
 
@@ -134,7 +182,8 @@ class VAD(object):
                     if isnan(weight):
                         weight = 1
 
-                    noise_var = weight * noise_var_orig + (1 - weight) * frame_var
+                    noise_var = \
+                        weight * noise_var_orig + (1 - weight) * frame_var
 
                     diff = np.abs(np.sum(noise_var - noise_var_prev))
                     if diff < self.epsilon:
