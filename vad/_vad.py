@@ -19,7 +19,7 @@ Noise". Please cite that paper when using this code for research purposes.
 
 Usage:
 >>> from vad import VAD
->>> detector = VAD()
+>>> detector = VAD(fs=16000)
 >>> speech = detector.detect_speech(sig, fs)
 
 """
