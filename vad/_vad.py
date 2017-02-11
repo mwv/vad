@@ -26,6 +26,7 @@ Usage:
 
 from __future__ import division
 
+import six.moves as sm
 import numpy as np
 
 # some underflow falls through after calls to i0 and i1, but these are caught
@@ -134,7 +135,7 @@ class VAD(object):
         n_frames = frames.shape[0]
 
         noise_var_tmp = zeros(self.NFFT//2+1)
-        for n in xrange(n_noise_frames):
+        for n in sm.range(n_noise_frames):
             frame = frames[n]
             noise_var_tmp = noise_var_tmp + (conj(frame) * frame).real
 
@@ -146,7 +147,7 @@ class VAD(object):
         G_MMSE = zeros((self.NFFT//2+1, n_frames))
 
         cum_Lambda = zeros(n_frames)
-        for n in xrange(n_frames):
+        for n in sm.range(n_frames):
             frame = frames[n]
             frame_var = (conj(frame) * frame).real
 
@@ -154,7 +155,7 @@ class VAD(object):
 
             if self.max_est_iter == -1 or n < self.max_est_iter:
                 noise_var_prev = noise_var_orig
-                for iter_idx in xrange(self.n_iters):
+                for iter_idx in sm.range(self.n_iters):
                     gamma = frame_var / noise_var
                     Y_mag = np.abs(frame)
 
