@@ -111,7 +111,7 @@ class VAD(object):
 
         """
         s = np.pad(sig, (self.wlen//2, 0), 'constant')
-        cols = np.ceil((s.shape[0] - self.wlen) / self.fshift + 1)
+        cols = int(np.ceil((s.shape[0] - self.wlen) / self.fshift + 1))
         s = np.pad(s, (0, self.wlen), 'constant')
         frames = as_strided(s, shape=(cols, self.wlen),
                             strides=(s.strides[0]*self.fshift,
