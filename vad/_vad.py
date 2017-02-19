@@ -80,7 +80,7 @@ class VAD(object):
         self.fshift = int(fs * self.win_hop_sec)
         self.win = hamming(self.wlen)
 
-    def detect_speech(self, sig, threshold, n_noise_frames=20):
+    def detect_speech(self, sig, threshold=0.5, n_noise_frames=20):
         """
         Return binary speech/non-speech decisions for each frame.
 
