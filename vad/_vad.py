@@ -133,6 +133,12 @@ class VAD(object):
         """
         frames = self.stft(sig)
         n_frames = frames.shape[0]
+        if n_noise_frames > n_frames:
+            raise ValueError(
+                'Number of requested noise frames exceeds'
+                'number of frames in signal. Decrease the number of noise '
+                'frames or the window size.'
+            )
 
         noise_var_tmp = zeros(self.NFFT//2+1)
         for n in sm.range(n_noise_frames):
